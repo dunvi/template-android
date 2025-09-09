@@ -32,8 +32,8 @@
             lib.optional(builtins.pathExists ./devenv.local.nix)
               ./devenv.local.nix;
 
-          inputsFrom = [
-            pkgs.androidStudioPackages.stable.full
+          buildInputs = [
+            pkgs.android-studio-full
           ];
 
           shellHook = ''
