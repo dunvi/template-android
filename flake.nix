@@ -23,6 +23,8 @@
           };
         };
 
+        sdkRoot = "${pkgs.androidenv.androidPkgs.androidsdk}/libexec/android-sdk";
+
       in
       {
         devShells.default = pkgs.mkShell {
@@ -36,9 +38,15 @@
             pkgs.android-studio-full
           ];
 
+          ANDROID_HOME="${sdkRoot}";
+          ANDROID_SDK_ROOT="${sdkRoot}";
+          ANDROID_NDK_ROOT="${sdkRoot}/ndk-bundle";
+
           shellHook = ''
             echo "welcome to android world, still in progress"
-            echo "android home is $ANDROID_HOME"
+            echo "ANDROID_HOME=$ANDROID_HOME"
+            echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+            echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT"
           '';
         };
       };
