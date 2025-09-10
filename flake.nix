@@ -23,8 +23,17 @@
           };
         };
 
-        sdkRoot = "${pkgs.androidenv.androidPkgs.androidsdk}/libexec/android-sdk";
+        androidBundle = pkgs.androidenv.composeAndroidPackages {
+          numLatestPlatformVersions = 2;
+          includeEmulator = true;
+          includeSystemImages = true;
+          includeSources = true;
+          includeNDK = true;
+        };
 
+        sdkRoot = "${androidBundle.androidsdk}/libexec/android-sdk";
+
+        androidStudio = pkgs.android-studio-full;
       in
       {
         devShells.default = pkgs.mkShell {
@@ -35,18 +44,27 @@
               ./devenv.local.nix;
 
           buildInputs = [
-            pkgs.android-studio-full
+            (androidStudio.withSdk (androidBundle).androidsdk)
+            androidBundle.androidsdk
+            androidBundle.platform-tools
+            pkgs.jdk17
           ];
 
           ANDROID_HOME="${sdkRoot}";
           ANDROID_SDK_ROOT="${sdkRoot}";
           ANDROID_NDK_ROOT="${sdkRoot}/ndk-bundle";
 
+          JAVA_HOME="${pkgs.jdk17}";
+          #GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${sdkRoot}/build-tools/${buildToolsVersion}/aapt2";
+
           shellHook = ''
             echo "welcome to android world, still in progress"
+
             echo "ANDROID_HOME=$ANDROID_HOME"
             echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
             echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT"
+
+            adb devices
           '';
         };
       };
