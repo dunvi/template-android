@@ -23,34 +23,11 @@
           };
         };
 
-        ndkVersion = "27.3.13750724";
+        mkAndroidBundle = with pkgs; opts: callPackage (import ./android-studio.nix { }) {};
+        androidBundle = mkAndroidBundle {};
 
-        androidBundle = pkgs.androidenv.composeAndroidPackages {
-          platformVersions = [ "36" ];
-          ndkVersions = [ ndkVersion ];
-          includeEmulator = true;
-          includeSystemImages = true;
-          includeSources = true;
-          includeNDK = true;
-        };
-
-        sdkRoot = androidBundle.androidsdk + "/libexec/android-sdk";
-        ndkRoot = sdkRoot + "/ndk/${ndkVersion}";
-
-        mkStudio = with pkgs; opts: callPackage (import ./android-studio.nix opts) {
-          fontsConf = makeFontsConf {
-            fontDirectories = [ ];
-          };
-          inherit buildFHSEnv;
-        };
-        androidStudio = mkStudio {
-          #version = "2025.1.3.7"; # "Android Studio Narwhal 3 Feature Drop | 2025.1.3"
-          #sha256Hash = "sha256-pet3uTmL4pQ/FxB2qKv+IZNx540gMC7hmfOaQ8iLQpQ=";
-          #channel = "stable";
-          #pname = "android-studio";
-          inherit ndkVersion;
-          androidSdk = androidBundle.androidsdk;
-        };
+        sdkRoot = androidBundle.paths.androidSdkRoot;
+        ndkRoot = androidBundle.paths.androidNdkRoot;
       in
       {
         devShells.default = pkgs.mkShell {
@@ -60,14 +37,10 @@
             lib.optional(builtins.pathExists ./devenv.local.nix)
               ./devenv.local.nix;
 
-          passthru = {
-            #inherit androidStudio;
-          };
-
           buildInputs = [
-            androidStudio.full
-            androidBundle.androidsdk
-            androidBundle.platform-tools
+            androidBundle.androidStudio
+            androidBundle.androidPkgs.androidsdk
+            androidBundle.androidPkgs.platform-tools
             pkgs.jdk
           ];
 

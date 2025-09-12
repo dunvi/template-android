@@ -1,7 +1,4 @@
-{
-  androidSdk,
-  ndkVersion,
-}:
+{}:
 
 # See https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/applications/editors/android-studio/default.nix
 # and https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/applications/editors/android-studio/common.nix
@@ -19,7 +16,7 @@
   fetchurl,
   findutils,
   file,
-  fontsConf,
+  makeFontsConf,
   git,
   gnugrep,
   gnused,
@@ -88,6 +85,22 @@ let
 
   drvName = "android-studio-${channel}-${version}";
   filename = "android-studio-${version}-linux.tar.gz";
+
+  fontsConf = makeFontsConf {
+    fontDirectories = [ ];
+  };
+
+  platformVersion = "36";
+  ndkVersion = "27.3.13750724";
+
+  androidPkgs = androidenv.composeAndroidPackages {
+    platformVersions = [ platformVersion ];
+    ndkVersions = [ ndkVersion ];
+    includeEmulator = true;
+    includeSystemImages = true;
+    includeSources = true;
+    includeNDK = true;
+  };
 
   androidStudio = stdenv.mkDerivation {
     name = "${drvName}-unwrapped";
@@ -245,18 +258,16 @@ let
       '')
     ];
   };
+
+  androidSdk = androidPkgs.androidsdk;
+  androidSdkRoot = "${androidSdk}/libexec/android-sdk";
+  androidNdkRoot = "${androidSdkRoot}/ndk/${ndkVersion}";
+
   mkAndroidStudioWrapper =
-    {
-      androidStudio,
-      androidSdk,
-      ndkVersion,
-    }:
+    {}:
     runCommand drvName
       {
         startScript =
-          let
-            androidSdkRoot = "${androidSdk}/libexec/android-sdk";
-          in
           ''
             #!${runtimeShell}
             echo "=== nixpkgs Android Studio wrapper" >&2
@@ -268,7 +279,7 @@ let
               export ANDROID_HOME="$ANDROID_SDK_ROOT"
               echo "  - ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >&2
 
-              ANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/${ndkVersion}"
+              ANDROID_NDK_ROOT="${androidNdkRoot}";
 
               if [ -d "$ANDROID_NDK_ROOT" ]; then
                 export ANDROID_NDK_ROOT
@@ -289,8 +300,6 @@ let
           {
             inherit version;
             unwrapped = androidStudio;
-            full = mkAndroidStudioWrapper { inherit androidStudio androidSdk ndkVersion; };
-            sdk = androidSdk;
           };
         meta = {
           license = with lib.licenses; [
@@ -318,5 +327,18 @@ let
         ln -s ${androidStudio}/bin/studio.png $out/share/pixmaps/${pname}.png
         ln -s ${desktopItem}/share/applications $out/share/applications
       '';
+
 in
-mkAndroidStudioWrapper { inherit androidStudio androidSdk ndkVersion; }
+{
+  inherit androidPkgs;
+  androidStudio = mkAndroidStudioWrapper {};
+  paths = {
+    androidSdkRoot = "${androidSdk}/libexec/android-sdk";
+    androidNdkRoot = "${androidSdkRoot}/ndk/${ndkVersion}";
+  };
+  versions = {
+    androidStudio = version;
+    platform = platformVersion;
+    ndk = ndkVersion;
+  };
+}
