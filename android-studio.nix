@@ -93,7 +93,7 @@ let
   platformVersion = "36";
   ndkVersion = "27.3.13750724";
 
-  androidPkgs = androidenv.composeAndroidPackages {
+  baseAndroidPkgs = androidenv.composeAndroidPackages {
     platformVersions = [ platformVersion ];
     ndkVersions = [ ndkVersion ];
     includeEmulator = true;
@@ -101,6 +101,24 @@ let
     includeSources = true;
     includeNDK = true;
   };
+
+  fixedSdk = baseAndroidPkgs.androidsdk.override (prev: {
+    postInstall = prev.postInstall + ''
+      rm ndk-bundle
+      rm tools
+      #clidir=$(find cmdline-tools/ -mindepth 1 -maxdepth 1 -type d -print0 | sort -rV | head -n 1)
+      #echo "attempting to rename $clidir as cmdline-tools/latest"
+      #mv $clidir cmdline-tools/latest
+      #ln -s ../$clidir cmdline-tools/latest
+    '';
+  });
+
+  androidPkgs = baseAndroidPkgs // { androidsdk = fixedSdk; };
+
+  androidSdkRoot = "${androidPkgs.androidsdk}/libexec/android-sdk";
+  androidNdkRoot = "${androidSdkRoot}/ndk/${ndkVersion}";
+
+  # TODO: Figure out where/why the command line tools are showing as not-latest
 
   androidStudio = stdenv.mkDerivation {
     name = "${drvName}-unwrapped";
@@ -119,6 +137,10 @@ let
     dontPatchShebangs = true;
 
     installPhase = ''
+      #echo "preparing the special androidsdk directory"
+      #mkdir -p asdk
+      #ln -sfv ${androidPkgs.androidsdk}/libexec/android-sdk/* asdk
+
       cp -r . $out
       wrapProgram $out/bin/studio \
         --set-default JAVA_HOME "$out/jbr" \
@@ -259,10 +281,6 @@ let
     ];
   };
 
-  androidSdk = androidPkgs.androidsdk;
-  androidSdkRoot = "${androidSdk}/libexec/android-sdk";
-  androidNdkRoot = "${androidSdkRoot}/ndk/${ndkVersion}";
-
   mkAndroidStudioWrapper =
     {}:
     runCommand drvName
@@ -331,9 +349,10 @@ let
 in
 {
   inherit androidPkgs;
+
   androidStudio = mkAndroidStudioWrapper {};
   paths = {
-    androidSdkRoot = "${androidSdk}/libexec/android-sdk";
+    androidSdkRoot = "${androidPkgs.androidsdk}/libexec/android-sdk";
     androidNdkRoot = "${androidSdkRoot}/ndk/${ndkVersion}";
   };
   versions = {
