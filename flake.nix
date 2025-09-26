@@ -6,7 +6,7 @@
 
   outputs = inputs@{ self, nixpkgs, flake-parts, ... }:
   let
-    platformVersion = "35";
+    platformVersion = "36";
     cliToolsVersion = "latest";
     ndkVersion = "28.2.13676358";
   in
@@ -24,14 +24,9 @@
         };
 
         androidenv =
-          base.callPackage
-            /home/l/sources/nixpkgs/pkgs/development/mobile/androidenv { };
-        studios =
-          base.callPackage
-            /home/l/sources/nixpkgs/pkgs/applications/editors/android-studio { };
+          base.androidenv;
 
         androidBundle = androidenv.composeAndroidPackages {
-          includeLegacyTools = false;
           platformVersions = [ platformVersion ];
           cmdLineToolsVersion = cliToolsVersion;
           ndkVersions = [ ndkVersion ];
@@ -41,9 +36,9 @@
           includeNDK = true;
         };
 
-        android-studio-full = studios.stable.withSdk androidBundle.androidsdk;
-        sdkRoot = androidBundle.androidsdk.sdkRoot;
-        ndkRoot = androidBundle.androidsdk.ndkRoot;
+        android-studio-full = base.android-studio.withSdk androidBundle.androidsdk;
+        sdkRoot = "${androidBundle.androidsdk}/libexec/android-sdk";
+        ndkRoot = "${sdkRoot}/ndk/${ndkVersion}";
 
         pkgs' = import nixpkgs {
           inherit system;
