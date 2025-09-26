@@ -5,17 +5,17 @@
   };
 
   outputs = inputs@{ self, nixpkgs, flake-parts, ... }:
+  let
+    platformVersion = "35";
+    cliToolsVersion = "latest";
+    ndkVersion = "28.2.13676358";
+  in
     flake-parts.lib.mkFlake { inherit inputs; } {
-
-      systems = [
-        "x86_64-linux"
-      ];
+      systems = ["x86_64-linux"];
 
       perSystem = { config, system, pkgs, ... }:
       let
-        lib = pkgs.lib // builtins;
-
-        pkgs = import nixpkgs {
+        base = import nixpkgs {
           inherit system;
           config = {
             allowUnfree = true;
@@ -23,31 +23,65 @@
           };
         };
 
-        mkAndroidBundle = with pkgs; opts: callPackage (import ./android-studio.nix { }) {};
-        androidBundle = mkAndroidBundle {};
+        androidenv =
+          base.callPackage
+            /home/l/sources/nixpkgs/pkgs/development/mobile/androidenv { };
+        studios =
+          base.callPackage
+            /home/l/sources/nixpkgs/pkgs/applications/editors/android-studio { };
 
-        sdkRoot = androidBundle.paths.androidSdkRoot;
-        ndkRoot = androidBundle.paths.androidNdkRoot;
+        androidBundle = androidenv.composeAndroidPackages {
+          includeLegacyTools = false;
+          platformVersions = [ platformVersion ];
+          cmdLineToolsVersion = cliToolsVersion;
+          ndkVersions = [ ndkVersion ];
+          includeEmulator = true;
+          includeSystemImages = true;
+          includeSources = true;
+          includeNDK = true;
+        };
+
+        android-studio-full = studios.stable.withSdk androidBundle.androidsdk;
+        sdkRoot = androidBundle.androidsdk.sdkRoot;
+        ndkRoot = androidBundle.androidsdk.ndkRoot;
+
+        pkgs' = import nixpkgs {
+          inherit system;
+          config = {
+            allowUnfree = true;
+            android_sdk.accept_license = true;
+          };
+
+          # Overlay in our chosen androidenv
+          overlays = [
+            (final: prev: {
+              inherit androidenv android-studio-full;
+            })
+          ];
+        };
+
+        lib = pkgs'.lib // builtins;
       in
       {
-        devShells.default = pkgs.mkShell {
+        devShells.default = pkgs'.mkShell {
           name = "template-android";
 
           imports = [] ++
-            lib.optional(builtins.pathExists ./devenv.local.nix)
-              ./devenv.local.nix;
+          lib.optional
+            (builtins.pathExists ./devenv.local.nix)
+            ./devenv.local.nix;
 
           buildInputs = [
-            androidBundle.androidStudio
-            androidBundle.androidPkgs.androidsdk
-            androidBundle.androidPkgs.platform-tools
-            pkgs.jdk
+            androidBundle.androidsdk
+            androidBundle.platform-tools
+            android-studio-full
+            pkgs'.jdk
           ];
 
           ANDROID_HOME="${sdkRoot}";
           ANDROID_SDK_ROOT="${sdkRoot}";
           ANDROID_NDK_ROOT="${ndkRoot}";
-          JAVA_HOME="${pkgs.jdk}";
+          JAVA_HOME="${pkgs'.jdk}";
 
           shellHook = ''
             echo "welcome to android world, still in progress"
@@ -70,7 +104,9 @@
             cmake.dir=$cmake_root
             EOF
 
-            adb devices
+            # we want to make sure adb is running, and this is an easy way to do so
+            # but it seems to fuck up the terminal if it triggers it to start
+            #adb devices
           '';
         };
       };

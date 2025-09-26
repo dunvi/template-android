@@ -1,3 +1,5 @@
 .envrc
+.gitignore
 flake.nix
+MyProject/
 README.md
